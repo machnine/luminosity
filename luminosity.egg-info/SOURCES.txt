@@ -1,6 +1,5 @@
 setup.py
 luminosity/__init__.py
-luminosity/_luminex_header.py
 luminosity/luminosity.py
 luminosity.egg-info/PKG-INFO
 luminosity.egg-info/SOURCES.txt
