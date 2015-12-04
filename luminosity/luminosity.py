@@ -27,20 +27,20 @@ class Reader(object):
             with open(csvfilename, 'r') as file:
                 tempdata = [row for row in csv.reader(file) if row]
         except FileNotFoundError:
-            print('{0} => File cannot be found!'.format(csvfilename))
+            print('%s => File cannot be found!'%csvfilename)
             return [], []
         except UnicodeDecodeError:
-            print('{0} => Invalid file format!'.format(csvfilename))
+            print('%s => Invalid file format!'%csvfilename)
             return [], []
         except Exception as err:
-            print('{0} => {1}'.format(csvfilename, err))
+            print('%s => %s'%(csvfilename, err))
             return [], []
         else:
             try:
                 splitpoint = next(index for index, _ in enumerate(tempdata)
                                   if 'Samples' and 'Min Events' in _)
             except StopIteration:
-                print('{0} => Invalid Luminex csv file.'.format(csvfilename))
+                print('%s => Invalid Luminex csv file.'%csvfilename)
                 return [], []
             else:
                 return tempdata[ :splitpoint + 1], tempdata[splitpoint + 2: ]
@@ -56,7 +56,7 @@ class Reader(object):
                     for index, row in enumerate(self.__results) 
                     if 'DataType:' in row]
         except Exception:
-            print('Error getting datatypes from {}'.format(self.__csvfilename))
+            print('Error getting datatypes from %s.'%self.__csvfilename)
             return []
 
     @property
@@ -71,8 +71,8 @@ class Reader(object):
             #gets only the probe names, replace space with '_' for namedtuples
             return [probe.replace(' ', '_') for probe in tempcols[2:-2]]
         except StopIteration:
-            print('No "Location", "Sample" found in : {}, check file format.'
-                  .format(self.__csvfilename))
+            print('No "Location", "Sample" found in : %s, check file format.'
+                  %self.__csvfilename)
             return []
         except Exception:
             return []
@@ -94,6 +94,31 @@ class Reader(object):
                 samplenamelist.append(Samplename(idx, loc, sample[1]))
         return samplenamelist
 
+    def samplename(self, index = None, location = None):
+        """
+        Returns a the name of a sample of a give index or location
+        """
+        temp1 = None
+        temp2 = None
+        if location is None:
+            for s in self.samplenames:
+                if index == s.index:
+                    return s.name
+        elif index is None:
+            for s in self.samplenames:
+                if location == s.location:
+                    return s.name
+        else:
+            for s in self.samplenames:
+                if index == s.index:
+                    temp1 = s
+                if location == s.location:
+                    temp2 = s               
+                if temp1.index == temp2.index:
+                    return temp1.name
+                else:
+                    raise ValueError('index and location refer to different sample')
+    
     def __idxloc(self, locstr):
         """helper function to return index and location"""
         #group(1) = index / group(2) = location
