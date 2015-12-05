@@ -3,8 +3,9 @@ Luminosity
 Python module for reading and writing Luminex csv files
 Tested under offical CPython 3.4 environment
 """
-
 import csv, collections, datetime
+
+__version__ = '0.1a'
 
 class Reader(object):
     """
