@@ -6,6 +6,6 @@ setup(name='luminosity',
       url='http://github.com/machnine/luminosity',
       author='Mian Chen',
       author_email='mianchen@gmail.com',
-      license='MIT',
+      license='CC BY-NC 3.0',
       packages=['luminosity'],
       zip_safe=False)
