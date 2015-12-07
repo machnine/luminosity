@@ -25,3 +25,5 @@ To uninstall, use the following command
 
 ##TODO:##
 * Writer class
+* Documentation
+* Release to PyPI
