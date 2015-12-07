@@ -49,7 +49,7 @@ class Reader(object):
     @property
     def datatypes(self):
         """
-        All collected datatypes in a list[]
+        All collected datatypes and parameters in a list[]
         """
         Datatype = collections.namedtuple('Datatype', ['name', 'index'])
         try:
@@ -59,6 +59,11 @@ class Reader(object):
         except Exception:
             print('Error getting datatypes from %s.'%self.__csvfilename)
             return []
+
+    @property
+    def datatype_names(self):
+        """list of all capture data type names"""
+        return [x.name for x in self.datatypes]
 
     @property
     def beadnames(self):
@@ -79,7 +84,7 @@ class Reader(object):
             return []
         
     @property
-    def samplenames(self):
+    def samples(self):
         """
         Returns all sample names tested in the run in named tuples
         collections.namedtuple('Samplename', ['index', 'location', 'name'])
@@ -94,7 +99,11 @@ class Reader(object):
             if idx:
                 samplenamelist.append(Samplename(idx, loc, sample[1]))
         return samplenamelist
-
+    @property
+    def samplenames(self):
+        """list of sample names"""
+        return [x.name for x in self.samples]
+    
     def samplename(self, index = None, location = None):
         """
         Returns a the name of a sample of a give index or location
@@ -102,15 +111,15 @@ class Reader(object):
         temp1 = None
         temp2 = None
         if location is None:
-            for s in self.samplenames:
+            for s in self.samples:
                 if index == s.index:
                     return s.name
         elif index is None:
-            for s in self.samplenames:
+            for s in self.samples:
                 if location == s.location:
                     return s.name
         else:
-            for s in self.samplenames:
+            for s in self.samples:
                 if index == s.index:
                     temp1 = s
                 if location == s.location:
@@ -181,7 +190,7 @@ class Reader(object):
         """
 
         sampleList = self.__validatedataparam(sampleindices,
-                                         (sample.index for sample in self.samplenames))
+                                         (sample.index for sample in self.samples))
         for dataSection in self.__beaddatatype(datatype):
             for idx in sampleList:
                 yield([self.__tryparsefloat(x) for x in dataSection[idx - 1]])
@@ -196,6 +205,13 @@ class Reader(object):
         except ValueError:
             return string
 
+    @property
+    def header_params(self):
+        """header parameters"""
+        return [x for x in dir(self.header)
+                if not x.startswith('_')]
+        
+    
     @property
     def header(self):
         """header property stores all meta data"""
