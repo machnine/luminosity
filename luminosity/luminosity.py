@@ -226,14 +226,14 @@ class Reader(object):
             self.__header = headerlist
 
         @property
-        def program(self):
+        def Program(self):
             """ Program used to generate the Luminex csv file """
             try:
                 return next((row[1] for row in self.__header if 'Program' in row))
             except Exception:
                 return ''
         @property
-        def build(self):
+        def Build(self):
             """
              Program version
             """
@@ -257,7 +257,7 @@ class Reader(object):
 
 
         @property
-        def machine_sn(self):
+        def SN(self):
             """
              Luminex machine SN number
             """
@@ -268,7 +268,7 @@ class Reader(object):
                 return ''
 
         @property
-        def session(self):
+        def Session(self):
             """
              Luminex session number
             """
@@ -279,7 +279,7 @@ class Reader(object):
                 return ''
 
         @property
-        def operator(self):
+        def Operator(self):
             """
              Operator
             """
@@ -294,7 +294,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_id(self):
+        def TemplateID(self):
             """
              Template ID
             """
@@ -305,7 +305,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_name(self):
+        def TemplateName(self):
             """
              Template name
             """
@@ -316,7 +316,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_version(self):
+        def TemplateVersion(self):
             """
              Template version
             """
@@ -327,7 +327,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_description(self):
+        def TemplateDescription(self):
             """
              Template description
             """
@@ -338,7 +338,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_developing_company(self):
+        def TemplateDevelopingCompany(self):
             """
              Template developing company
             """
@@ -349,7 +349,7 @@ class Reader(object):
                 return ''
 
         @property
-        def template_author(self):
+        def TemplateAuthor(self):
             """
              Template author
             """
@@ -360,7 +360,7 @@ class Reader(object):
                 return ''
 
         @property
-        def ddgate(self):
+        def DDGate(self):
             """
              DDGate as set by the template
             """
@@ -371,7 +371,7 @@ class Reader(object):
                 return ''
 
         @property
-        def sample_timeout(self):
+        def SampleTimeout(self):
             """
              Sample timeout as set by the template
             """
@@ -382,7 +382,7 @@ class Reader(object):
                 return ''
 
         @property
-        def batch_author(self):
+        def BatchAuthor(self):
             """
              Author of the multibatch if the session is part of a 'Multibatch'
             """
@@ -393,7 +393,7 @@ class Reader(object):
                 return ''
 
         @property
-        def batch_starttime(self):
+        def BatchStartTime(self):
             """
              Run start time of the 'Multibatch'
             """
@@ -404,7 +404,7 @@ class Reader(object):
                 return ''
 
         @property
-        def batch_stoptime(self):
+        def BatchStopTime(self):
             """
              Run stop time of the 'Multibatch'
             """
@@ -415,7 +415,7 @@ class Reader(object):
                 return ''
 
         @property
-        def batch_description(self):
+        def BatchDescription(self):
             """
              Description of the 'Multibatch'
             """
@@ -426,7 +426,7 @@ class Reader(object):
                 return ''
 
         @property
-        def batch_comment(self):
+        def BatchComment(self):
             """
              User comments in the 'Multibatch'
             """
@@ -437,7 +437,7 @@ class Reader(object):
                 return ''
            
         @property
-        def sample_volume(self):
+        def SampleVolume(self):
             """
              Sample volume as set by the template
             """
@@ -448,7 +448,7 @@ class Reader(object):
                 return ''
 
         @property
-        def min_events(self):
+        def Min_Events(self):
             """
              Minimum events in a run
             """
@@ -460,7 +460,7 @@ class Reader(object):
 
 
         @property
-        def assay_lotinfo(self):
+        def AssayLotInfo(self):
             """
              Assay standards or controls info
             """
@@ -480,7 +480,7 @@ class Reader(object):
                 return data
 
         @property
-        def cal1(self):
+        def CAL1(self):
             """
              CAL1 beads reading
             """
@@ -488,7 +488,7 @@ class Reader(object):
                     if 'Classification Calibrator' in row])
 
         @property
-        def cal2(self):
+        def CAL2(self):
             """
              CAL2 beads reading
             """
@@ -496,7 +496,7 @@ class Reader(object):
                     if 'Reporter Calibrator' in row])
 
         @property
-        def con1(self):
+        def CON1(self):
             """
              CON1 beads reading
             """
@@ -504,7 +504,7 @@ class Reader(object):
                     if 'Classification Control' in row])
 
         @property
-        def con2(self):
+        def CON2(self):
             """
              CON2 beads reading
             """
