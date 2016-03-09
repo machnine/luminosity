@@ -1,8 +1,0 @@
-setup.py
-luminosity/__init__.py
-luminosity/luminosity.py
-luminosity.egg-info/PKG-INFO
-luminosity.egg-info/SOURCES.txt
-luminosity.egg-info/dependency_links.txt
-luminosity.egg-info/not-zip-safe
-luminosity.egg-info/top_level.txt

@@ -1,512 +1,414 @@
-﻿"""
-Luminosity
-Python module for reading and writing Luminex csv files
-Tested under offical CPython 3.4 environment
-"""
-import csv, collections, datetime
+##############################################################################
+##                                                                          ##
+##  Luminosity - A Python Module for Reading and Writing Luminex CSV Files  ##
+##                 By Mian Chen [mianchen(at)gmail(dot)com]                 ##
+##                        v0.2 2016-03-10                                   ##
+##                                                                          ##
+##                   Release Under: Creative Common License                 ##
+##                     Attribution-NonCommercial-ShareAlike                 ##
+##                                 CC BY-NC-SA                              ##
+##                                                                          ##
+##############################################################################
 
-__version__ = '0.1a'
+# Tested under CPython 3.4, pandas 0.17
 
-class Reader(object):
-    """
-    Luminosity Reader class
-    reads raw Luminex csv files into easy-to-manipulate variables
-    """
+import pandas as pd
+import csv, enum
+from pandas import Series, DataFrame
 
-    def __init__(self, csvfilename):
-        """
-        Reader class constructor
-        """
-        self.__csvfilename = csvfilename
-        self.__header, self.__results = self.__readcsv(self.__csvfilename)
+pd.set_option('display.max_columns', 15)
+pd.set_option('display.max_rows', 20)
+pd.set_option('display.max_colwidth', 20)
 
-    def __readcsv(self, csvfilename):
-        """
-        Private method to split csv file into header and results
-        """
+__version__ = '0.2'
+
+
+METAINFO = enum.Enum('METAINFO', 
+                     ['Program','Build','Date','SN','Session','Operator',
+                      'TemplateID','TemplateName','TemplateVersion',
+                      'TemplateDescription','TemplateDevelopingCompany',
+                      'TemplateAuthor','SampleVolume','DDGate','SampleTimeout',
+                      'BatchAuthor','BatchStartTime','BatchStopTime',
+                      'BatchDescription','BatchComment'])
+
+class Luminosity:
+    
+    def __init__(self, filename):
+        
+        self.FileName = filename
+        
+        with open(filename, 'r') as f:
+            #open the file and convert into a list in memory
+            self.__data = list(csv.reader(f.readlines()))
+            
+            #find the where every "DataType:" chunck locates
+            self.__dataTypes = self.__locateDataTypes()
+            
+            #split header from the first row of "DataType:"
+            split_point = self.__dataTypes.min()
+            self.__header = self.__data[:split_point]
+            
+            #read data into a multi index dataframe
+            self.__data = self.__readData()
+            
+            #get meta data
+            self.__meta = self.__metaInfo()
+   
+
+    ######################### PRIVATE METHODS #####################
+
+    def __locateDataTypes(self):
+        '''
+        find out how many "DataType:" sections are in the csv
+        file and return where they are as a panda Series 
+        '''
+        names = []
+        locs = []
+        for i, x in enumerate(self.__data):
+            if x and 'DataType:' in x[0]:
+                names.append(x[1])
+                locs.append(i)
+        return Series(locs, index=names)
+      
+    def __locateCalCon(self):
+        '''
+        locate the position of cal and con bead data if exist
+        '''
+        d = {}
+        for i, x in enumerate(self.__header):
+            if x and 'CALInfo:' in x[0]:
+                d['CAL'] = i
+            elif x and 'CONInfo:' in x[0]:
+                d['CON'] = i
+        return d
+    
+    def __calConInfo(self, calcon):
+        '''
+        return cal or con info if exist
+        '''
         try:
-            with open(csvfilename, 'r') as file:
-                tempdata = [row for row in csv.reader(file) if row]
-        except FileNotFoundError:
-            print('%s => File cannot be found!'%csvfilename)
-            return [], []
-        except UnicodeDecodeError:
-            print('%s => Invalid file format!'%csvfilename)
-            return [], []
-        except Exception as err:
-            print('%s => %s'%(csvfilename, err))
-            return [], []
-        else:
-            try:
-                splitpoint = next(index for index, _ in enumerate(tempdata)
-                                  if 'Samples' and 'Min Events' in _)
-            except StopIteration:
-                print('%s => Invalid Luminex csv file.'%csvfilename)
-                return [], []
+            #get the position of cal/con
+            n = self.__locateCalCon()[calcon]
+            
+            #turn into a dataframe
+            #n=location, n+1=header, n+2,n+3 = values
+            df = DataFrame(self.__header[n+2:n+4], 
+                           columns = self.__header[n+1],
+                           dtype = float)
+            #reset index
+            df.set_index(['ProductName'], inplace=True)
+        except:
+            df = DataFrame()
+        return df
+    
+    def __readData(self, DataTypes=None):
+        '''
+        return sections of bead data in a dictionary of dataframes
+        each dataframe contains one section of the bead data belongs
+        to a datatype. dataType can be the datatype name (str) or 
+        list like object containing all of the wanted names
+        '''
+        data = []
+        names = []
+        
+        #if DataType specified use it to restrict return results
+        if DataTypes:
+            #slice the self.__datatypes Series
+            #if a string is given
+            if isinstance(DataTypes, str):
+                dtList = self.__dataTypes[[DataTypes]]
+            #if a list is given
             else:
-                return tempdata[ :splitpoint + 1], tempdata[splitpoint + 2: ]
+                dtList = self.__dataTypes[DataTypes]
+
+        #otherwise use the full Series
+        else:
+            dtList = self.__dataTypes
+        
+        #iterate through the selected datatypes
+        for x in dtList.index:
+            #infer 'count' and 'trimmed count' data to int
+            #this step is necessary for OneLambda HLA Fusion to work
+            if 'Count' in x:
+                dtype = int
+            #infer all other numerical strings to float
+            else:
+                dtype = float
+                
+            names.append(x)    #name of data
+            loc = dtList[x]    #starting location of data
+            data.append(self.__readDataLoc(loc, dtype=dtype))
+        return pd.concat(data, keys=names)
+ 
+    def __oneDataBlock(self):
+        '''
+        read the first data block
+        '''
+        return self.__data.loc[self.__dataTypes.index[0]]
+   
+    def __readDataLoc(self, dtLoc, dtype=None):
+        '''
+        return a dataframe of data chunck for a given datatype
+        '''
+        hRow = dtLoc + 1                  #position of the header row
+        fRow = dtLoc + 2                  #first row of the chunck of data
+        lRow = dtLoc + 2 + self.SampleNum #last row
+        
+        #convert and store data into dataDict using dataTypeName as key
+        df = DataFrame(self.__data[fRow:lRow],
+                       columns = self.__data[hRow],
+                       dtype = dtype) 
+            
+        #set Location column as index
+        df.set_index('Location', inplace=True)
+        return df
+   
+    def __metaInfo(self):
+        '''
+        MetaInfo property return a dict containing all meta info
+        '''
+        d = {}
+        for x in METAINFO:
+            d[x.name] = self.__getMetaInfo(x.name)
+        return d
+    
+    def __getMetaInfo(self, Name=None):
+        '''
+        get the meta info for a given Name
+        '''
+        if Name == None:
+            return ''
+        elif Name == 'Date':
+            date = ' '.join(self.RawMeta.loc[Name, 'Value':'Extra'].values)
+            return date
+        elif Name in self.RawMeta.index:
+            return self.RawMeta.loc[Name, 'Value']
+        else:
+            return ''
+
+    def __rebuildMeta(self):
+        '''
+        reconstruct the first part of meta data down until
+        CAL and CON info if exists
+        '''
+        text = ''
+        for x in METAINFO:
+            if x.name not in ['Program', 'Date']:
+                text += ('\"{}\",\"{}\"\r\n'
+                         .format(x.name, self.__meta[x.name]))
+            elif x.name == 'Date':
+                text += ('\"{}\",\"{d[0]}\", "{d[1]}\"\r\n\r\n'
+                         .format(x.name, d = self.__meta[x.name].split(' ')))
+            elif x.name == 'Program':
+                text += ('\"{}\","{}\",809\r\n'
+                         .format(x.name, self.__meta[x.name]))
+        return text
+        
+    def __rebuildCalcon(self):
+        '''
+        reconstruct CAL and CON info if exists
+        '''
+        text = ''
+        if not self.CalInfo.empty:
+            text += '\"CALInfo:\"\r\n'
+            text += self.CalInfo.to_csv(quoting=csv.QUOTE_ALL, quotechar='"')
+        if not self.ConInfo.empty:
+            text += '\"CONInfo:\"\r\n'
+            text += self.ConInfo.to_csv(quoting=csv.QUOTE_ALL, quotechar='"')
+        return text
+        
+    def __rebuildMisc(self):
+        '''
+        Rebuild the last bit of meta info before the actual results
+        '''
+        return ('''\"AssayLotInfo:\"\r\n'''
+                '''<No assay standards or controls found>'''
+                '''\r\n\r\n\r\n\r\n\r\n\"Samples\",\"{}\",'''
+                '''\"Min Events\",\"0\"\r\n\"Results\"'''
+                '''\r\n\r\n'''.format(self.SampleNum))
+  
+    def __metaCSV(self):
+        '''
+        return csv string of meta data ready to be saved into a file
+        '''
+        return self.__rebuildMeta() +                self.__rebuildCalcon() + self.__rebuildMisc()
+        
+    def __dataCSV(self):
+        text = ''
+        for x in self.__data.index.levels[0]:
+            text += '\"DataType:\",\"{}\"\r\n'.format(x)
+            text += self.__data.loc[x].to_csv(quoting=csv.QUOTE_ALL,
+                                              quotechar='"') 
+        return text
+
+    ########################### PROPERTIES ###########################
+    
+    @property
+    def Data(self):
+        '''
+        return a dataframe with all data blocks
+        '''
+        return self.__data
+    
+    @property
+    def DataTypes(self):
+        '''
+        list of captured data types
+        '''
+        return self.__dataTypes.index
+    
+    @property
+    def SampleNum(self):
+        '''
+        return the calculated number of samples in the run
+        the ["Samples","##","Min Events","##"] row is ignored
+        '''
+        #the number of rows difference between consecutive data blocks
+        diff = self.__dataTypes.diff()
+        #len == 2 : only 1 consistent value + NaN
+        #len > 2 : more than 1 consistent value + NaN
+        #len < 2 : the data appear to be blank: all NaN
+        if len(set(diff)) == 2:
+            return int(diff[1]) - 3
+        else:
+            raise ValueError('Inconsistent number of samples '
+                             'in each data block!')
+    
+    @property
+    def Samples(self):
+        '''
+        return all sample names
+        '''
+        return self.__oneDataBlock()['Sample']
+    
+    @property
+    def Beads(self):
+        '''
+        return all bead labels/names
+        '''
+        return self.__oneDataBlock().columns[1:-2] 
+    
+    @property
+    def RawMeta(self):
+        '''
+        Return meta data in a dict
+        '''       
+        #convert header into a pandas dataframe
+        df = DataFrame(self.__header)
+        df.set_index(0, inplace=True)
+        df.index.names = ['Meta_Info']
+        df.rename(columns={1: 'Value', 2:'Extra'}, inplace=True)
+        return df
 
     @property
-    def datatypes(self):
-        """
-        All collected datatypes and parameters in a list[]
-        """
-        Datatype = collections.namedtuple('Datatype', ['name', 'index'])
-        try:
-            return [Datatype(row[1], index) 
-                    for index, row in enumerate(self.__results) 
-                    if 'DataType:' in row]
-        except Exception:
-            print('Error getting datatypes from %s.'%self.__csvfilename)
-            return []
+    def Meta(self):
+        '''
+        return meta data in a dict
+        '''
+        return self.__meta
 
-    @property
-    def datatype_names(self):
-        """list of all capture data type names"""
-        return [x.name for x in self.datatypes]
-
-    @property
-    def beadnames(self):
-        """
-        Returns all beads (probes) names in the run
-        """
-        #gets the 'Location','Sample', ....., 'Notes' row
-        try:
-            tempcols = next((row for row in self.__results 
-                         if 'Location' and 'Sample' and 'Notes' in row))
-            #gets only the probe names, replace space with '_' for namedtuples
-            return [probe.replace(' ', '_') for probe in tempcols[2:-2]]
-        except StopIteration:
-            print('No "Location", "Sample" found in : %s, check file format.'
-                  %self.__csvfilename)
-            return []
-        except Exception:
-            return []
+      
+        
         
     @property
-    def samples(self):
-        """
-        Returns all sample names tested in the run in named tuples
-        collections.namedtuple('Samplename', ['index', 'location', 'name'])
-        """
-        Samplename = collections.namedtuple('Samplename', 
-                                            ['index', 'location', 'name'])
-        top = self.datatypes[0].index + 2  # start of datatype[0] data
-        end = self.datatypes[1].index      # end of the datatype[0] data
-        samplenamelist = []
-        for sample in self.__results[top : end]:
-            idx, loc = self.__idxloc(sample[0])
-            if idx:
-                samplenamelist.append(Samplename(idx, loc, sample[1]))
-        return samplenamelist
+    def CalInfo(self):
+        '''
+        return a df containing CAL1/CAL2 info
+        '''
+        return self.__calConInfo('CAL')
+    
     @property
-    def samplenames(self):
-        """list of sample names"""
-        return [x.name for x in self.samples]
+    def ConInfo(self):
+        '''
+        return a df containing CON1/CON2 info
+        '''        
+        return self.__calConInfo('CON')
+
     
-    def samplename(self, index = None, location = None):
-        """
-        Returns a the name of a sample of a give index or location
-        """
-        temp1 = None
-        temp2 = None
-        if location is None:
-            for s in self.samples:
-                if index == s.index:
-                    return s.name
-        elif index is None:
-            for s in self.samples:
-                if location == s.location:
-                    return s.name
+    ######################### METHODS ###################################
+    
+    def GetMeta(self, Name=None):
+        '''
+        return meta data when given a name or METAINFO enum
+        '''
+        if Name and isinstance(Name, METAINFO):
+            return self.__meta[Name.name]
+        elif Name and isinstance(Name, str):
+            return self.__meta[Name]
         else:
-            for s in self.samples:
-                if index == s.index:
-                    temp1 = s
-                if location == s.location:
-                    temp2 = s               
-                if temp1.index == temp2.index:
-                    return temp1.name
-                else:
-                    raise ValueError('index and location refer to different sample')
+            return ''
     
-    def __idxloc(self, locstr):
-        """helper function to return index and location"""
-        #group(1) = index / group(2) = location
-        pattern = r'(\d{1,2}\s?)(?:\(([A-H]\d{1,2})\))?'
-        matches = csv.re.search(pattern, locstr)
-        idx = None
-        loc = None
-        if matches:
-            if matches.group(2):
-                idx = int(matches.group(1))
-                loc = matches.group(2)
-            elif matches.group(1):
-                idx = int(matches.group(1))
-        return (idx, loc)
-    
-    def __beaddatatype(self, datatype = None):
-        """
-        helper function return section(s) of data of given datatypes
-        in the form of str, tuple or list
-        """
-        # get the list of datatype names
-        dlist = self.__validatedataparam(datatype, 
-                                        (dt.name for dt in self.datatypes))
-        for item in dlist:
-            for idx, dtype in enumerate(self.datatypes):
-                if item == dtype.name:
-                    try:
-                        # first to penultimate datatypes
-                        yield(self.__results[dtype.index + 2: self.datatypes[idx + 1].index])
-                    except:
-                        # last datatype
-                        yield(self.__results[dtype.index + 2:])
-
-    def __validatedataparam(self, param, params):
-        """helper function to validate input"""
-        # convert to 1 tuple if is str
-        if isinstance(param, (str, int)):
-            param = (param, )
-
-        # if not None, check if is a subset of params
-        if param == None:   # if no entry, return whole list
-            return params
-        elif isinstance(param, (list, tuple)) and \
-                    set(param).issubset(set(params)):
-            return param
-        else: # if not a subset or None return an empty tuple
-            return ()
-
-    def beaddata(self, datatype = None, sampleindices = None):
-        """
-        return a generator of data of given datatype and sample indices
-        e.g.
-        Reader.beaddata(datatype = 'Result') 
-                returns the result section of all samples
-        Reader.beaddata(datatype = 'Result', sampleindices=(1,)) 
-                returns the result section of samples 1
-        Reader.beaddata(sampleindices=(1,3,5)) 
-                returns all result section of samples 1, 3 and 5
-        """
-
-        sampleList = self.__validatedataparam(sampleindices,
-                                         (sample.index for sample in self.samples))
-        for dataSection in self.__beaddatatype(datatype):
-            for idx in sampleList:
-                yield([self.__tryparsefloat(x) for x in dataSection[idx - 1]])
-
-    def __tryparsefloat(self, string):
-        """
-        helper function returns float value of the string
-        otherwise return the untouch string
-        """
+    def UpdateWith(self, from_obj, from_loc, to_loc):
+        '''
+        update the current Luminosity object with one sample data 
+        from a different Luminosity object
+        Usage:
+        UpdateWith(sourceObject, 'source sample label', 'target lable')
+        UpdateWith(sourceObject, [list of labels], [list of targets])
+        '''
+        #convert str into list like object
+        if isinstance(from_loc, str) and isinstance(to_loc, str):
+            from_loc = [from_loc]
+            to_loc = [to_loc]
+        
         try:
-            return float(string)
+            #sanity check before updating
+            if (self.Beads == from_obj.Beads).all()                 and (self.DataTypes == from_obj.DataTypes).all():
+                   
+                sdata = from_obj.Data
+                
+                #back up data before updating
+                backupData = self.__data.copy()
+                
+                #updating...
+                for floc, tloc in zip(from_loc, to_loc):
+                    temp = sdata.xs(floc, level = 1,
+                                    drop_level = False)
+                    
+                    #set the source location index same as target for update
+                    locations = temp.index.levels[1].values
+                    n = list(locations).index(floc)
+                    locations[n] = tloc
+                    
+                    #update the backup of this dataframe from source
+                    backupData.update(temp)
+                    
+                    #reverse the source location index back to previous value
+                    #NB: when the index of a new copy of a dataframe changes
+                    #the original corresponding index in the old dataframe
+                    #also changes.
+                    locations[n] = floc
+                
+                #if no exception, update the data of this object
+                self.__data = backupData
+                return True
+            
+            else:
+                raise ValueError
         except ValueError:
-            return string
-
-    @property
-    def header_params(self):
-        """header parameters"""
-        return [x for x in dir(self.header)
-                if not x.startswith('_')]
-        
+            msg = ('Update Failed: <{}> do not have identical bead '
+                   'labels and/or data types to this object!'
+                   .format(from_obj.FileName))
+            
+            return False, msg
     
-    @property
-    def header(self):
-        """header property stores all meta data"""
-        return self.__Header(self.__header)
+    def Output(self, FileName=None):
+        '''
+        output (write) the data as a fully and correctly formatted
+        Luminex csv file to a given file name. if no name is given
+        write to the current folder using the current filename_new.csv
+        as output destination file name.
+        returns true/false and the output path depending on success
+        '''
+        if FileName:
+            file = FileName
+        else:
+            file = self.FileName.replace('.csv', '_new.csv')
+        text = self.__metaCSV() + self.__dataCSV()
+        try: 
+            with open(file, 'w') as f:
+                f.write(text)
+            return True, file
+        except:
+            return False, file
 
-
-    class __Header(object):
-        """
-        Header class to store meta data
-        """
-        def __init__(self, headerlist):
-            self.__header = headerlist
-
-        @property
-        def Program(self):
-            """ Program used to generate the Luminex csv file """
-            try:
-                return next((row[1] for row in self.__header if 'Program' in row))
-            except Exception:
-                return ''
-        @property
-        def Build(self):
-            """
-             Program version
-            """
-            try:
-                return next((row[1] for row in self.__header if 'Build' in row))
-            except Exception:
-                return ''
-
-        @property
-        def datetime(self):
-            """
-             Date when data was generated
-            """
-            try:
-                for row in self.__header:
-                    if row[0] == 'Date' and ':' in row[2]:
-                        return datetime.datetime.strptime(row[1] + ' ' + row[2], 
-                                                          '%d/%m/%Y %H:%M:%S')
-            except Exception:
-                return ''
-
-
-        @property
-        def SN(self):
-            """
-             Luminex machine SN number
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'SN' in row))
-            except Exception:
-                return ''
-
-        @property
-        def Session(self):
-            """
-             Luminex session number
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'Session' in row))
-            except Exception:
-                return ''
-
-        @property
-        def Operator(self):
-            """
-             Operator
-            """
-            try:
-                op = next((row[1] for row in self.__header
-                             if 'Operator' in row))
-                if op:
-                    return op
-                else:
-                    return self.batch_author
-            except Exception:
-                return ''
-
-        @property
-        def TemplateID(self):
-            """
-             Template ID
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateID' in row))
-            except Exception:
-                return ''
-
-        @property
-        def TemplateName(self):
-            """
-             Template name
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateName' in row))
-            except Exception:
-                return ''
-
-        @property
-        def TemplateVersion(self):
-            """
-             Template version
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateVersion' in row))
-            except Exception:
-                return ''
-
-        @property
-        def TemplateDescription(self):
-            """
-             Template description
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateDescription' in row))
-            except Exception:
-                return ''
-
-        @property
-        def TemplateDevelopingCompany(self):
-            """
-             Template developing company
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateDevelopingCompany' in row))
-            except Exception:
-                return ''
-
-        @property
-        def TemplateAuthor(self):
-            """
-             Template author
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'TemplateAuthor' in row))
-            except Exception:
-                return ''
-
-        @property
-        def DDGate(self):
-            """
-             DDGate as set by the template
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'DDGate' in row))
-            except Exception:
-                return ''
-
-        @property
-        def SampleTimeout(self):
-            """
-             Sample timeout as set by the template
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'SampleTimeout' in row))
-            except Exception:
-                return ''
-
-        @property
-        def BatchAuthor(self):
-            """
-             Author of the multibatch if the session is part of a 'Multibatch'
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'BatchAuthor' in row))
-            except Exception:
-                return ''
-
-        @property
-        def BatchStartTime(self):
-            """
-             Run start time of the 'Multibatch'
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'BatchStartTime' in row))
-            except Exception:
-                return ''
-
-        @property
-        def BatchStopTime(self):
-            """
-             Run stop time of the 'Multibatch'
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'BatchStopTime' in row))
-            except Exception:
-                return ''
-
-        @property
-        def BatchDescription(self):
-            """
-             Description of the 'Multibatch'
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'BatchDescription' in row))
-            except Exception:
-                return ''
-
-        @property
-        def BatchComment(self):
-            """
-             User comments in the 'Multibatch'
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'BatchComment' in row))
-            except Exception:
-                return ''
-           
-        @property
-        def SampleVolume(self):
-            """
-             Sample volume as set by the template
-            """
-            try:
-                return next((row[1] for row in self.__header
-                             if 'SampleVolume' in row))
-            except Exception:
-                return ''
-
-        @property
-        def Min_Events(self):
-            """
-             Minimum events in a run
-            """
-            try:
-                return int(next((row[3] for row in self.__header
-                                 if 'Samples' and 'Min Events' in row)))
-            except Exception:
-                return 0
-
-
-        @property
-        def AssayLotInfo(self):
-            """
-             Assay standards or controls info
-            """
-            try:
-                head = next((self.__header.index(row) + 1 for row in self.__header
-                             if 'AssayLotInfo:' in row))
-                tail = next((self.__header.index(row) for row in self.__header
-                             if 'Samples' and 'Min Events' in row))
-                return self.__header[head : tail]
-            except Exception:
-                return ''
-        
-        def __calconproc(self, data):
-            if len(data) > 0 :
-                return data[0]
-            else:
-                return data
-
-        @property
-        def CAL1(self):
-            """
-             CAL1 beads reading
-            """
-            return self.__calconproc([row for row in self.__header
-                    if 'Classification Calibrator' in row])
-
-        @property
-        def CAL2(self):
-            """
-             CAL2 beads reading
-            """
-            return self.__calconproc([row for row in self.__header
-                    if 'Reporter Calibrator' in row])
-
-        @property
-        def CON1(self):
-            """
-             CON1 beads reading
-            """
-            return self.__calconproc([row for row in self.__header
-                    if 'Classification Control' in row])
-
-        @property
-        def CON2(self):
-            """
-             CON2 beads reading
-            """
-            return self.__calconproc([row for row in self.__header
-                    if 'Reporter Control' in row])
