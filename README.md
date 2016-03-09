@@ -13,6 +13,7 @@ _Luminex IS100/200 exported csv files with/without all additional features enabl
 * CPython 3.4 32/64 bit<br>
 * Windows 7 SP1 32/64 bit<br>
 * Ubuntu 14.04 LTS 32/64 bit<br>
+* FreeBSD 9.3 64 bit<br>
 
 ## Dependancies
 * pandas 0.17
