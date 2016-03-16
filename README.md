@@ -23,9 +23,84 @@ _Luminex IS100/200 exported csv files with/without all additional features enabl
 ## Installation ##
 Installation is not yet available via pip from PyPI. To install, clone this repo or download the .zip file of this module, then run the following command in a terminal window or Windows command line prompt:
 
-```python setup.py install```
+```
+python setup.py install
+```
 
 To uninstall, use the following command
 
-```pip uninstall luminosity```
+```
+pip uninstall luminosity
+```
 
+## Properties ##
+
+| Property|Data Type|
+|------|-------|
+| Luminosity.Beads | pandas.indexes.base.Index|
+| Luminosity.CalInfo|pandas.core.frame.DataFrame|
+| Luminosity.ConInfo|pandas.core.frame.DataFrame|
+| Luminosity.Data|pandas.core.frame.DataFrame|
+| Luminosity.DataTypes|pandas.indexes.base.Index|
+| Luminosity.Meta|dict|
+| Luminosity.RawMeta|pandas.core.frame.DataFrame|
+| Luminosity.SampleNum|int|
+| Luminosity.Samples|pandas.core.series.Series|
+
+## Methods ##
+
+* Luminosity.GetMeta()
+* Luminosity.Output()
+* Luminosity.UpdateWith()
+
+## Quick start ##
+* Get meta data:
+```python
+    from luminosity import Luminosity     # import the module
+	c = Luminosity(path_to_your_csv_file) # create a Luminosity object
+    print('Machine Serial Number is: {}.'.format(c.GetMeta('SN')))
+```
+
+* Get the 'Trimmed Mean' values for sample at position '5 (A12)':
+```python
+   tmean = d.Data.loc[('Trimmed Mean', '5 (A12)'), : ]
+   print(tmean)
+```
+
+* Get all readings for sample 'SAMPLE_008':
+```python
+   sample_008 = d.Data[d.Data['Sample'] == 'SAMPLE_008']
+   print(sample_008)
+```
+
+* Edit information in a csv file and write to a new output file:
+```python
+    from luminosity import Luminosity     # import the module
+	c = Luminosity(path_to_your_csv_file) # create a Luminosity object
+    c.Meta['Operator'] = 'New Operator'   # change something
+    c.Output('newfile.csv')               # write to a new file
+```
+
+* Replace sample data in target csv file with sample data from a source csv file:
+
+|File 1 (target) | ||File2 (source)||
+|-------|----|-----|-----------|
+|Location|Sample||Location|	Sample|
+|1 (E11)|Sample 1 ...|<--|1 (C2)|Sample A ...|
+|2 (F11)|Sample 2 ...||||
+|3 (G11)|Sample 3 ...|<--|2 (D2)|Sample B ...|
+|4 (H11)|Sample 4 ...||||
+|5 (A12)|Sample 5 ...|<--|3 (E2)|Sample C ...|
+
+```python
+    
+    from luminosity import Luminosity       # import the module
+	c1 = Luminosity(path_to_your_csv_file1) # create a Luminosity object 1
+    c2 = Luminosity(path_to_your_csv_file2) # create a Luminosity object 2
+    
+    c1.UpdateWith(from_obj = c2,            # update file1 as shown in above table
+                  from_loc = ['1 (C2)', '2 (D2)', '3 (E2)'], 
+                  to_loc = ['1 (E11)', '3 (G11)', '5 (A12)'])
+                  
+    c1.Output()  # write to current directory as a new file
+```
