@@ -83,14 +83,14 @@ pip uninstall luminosity
 
 * Replace sample data in target csv file with sample data from a source csv file:
 
-|File 1 (target) | ||File2 (source)||
-|-------|----|-----|-----------|
-|Location|Sample||Location|	Sample|
-|1 (E11)|Sample 1 ...|<--|1 (C2)|Sample A ...|
-|2 (F11)|Sample 2 ...||||
-|3 (G11)|Sample 3 ...|<--|2 (D2)|Sample B ...|
-|4 (H11)|Sample 4 ...||||
-|5 (A12)|Sample 5 ...|<--|3 (E2)|Sample C ...|
+|File 1 (target) | |File2 (source)||
+|-------|---------|-----------|---|
+|Location|Sample|Location|	Sample|
+|1 (E11)|Sample 1 ...|1 (C2)|Sample A ...|
+|2 (F11)|Sample 2 ...||
+|3 (G11)|Sample 3 ...|2 (D2)|Sample B ...|
+|4 (H11)|Sample 4 ...||
+|5 (A12)|Sample 5 ...|3 (E2)|Sample C ...|
 
 ```python
     
