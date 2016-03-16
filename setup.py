@@ -1,6 +1,6 @@
 from setuptools import setup
 setup(name='luminosity',
-      version='0.2',
+      version='0.2.1',
       packages = ['luminosity'],  
       description='Python module for reading and writing Luminex CSV files',
       url='http://github.com/machnine/luminosity',

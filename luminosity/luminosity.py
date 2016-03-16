@@ -20,7 +20,7 @@ pd.set_option('display.max_columns', 15)
 pd.set_option('display.max_rows', 20)
 pd.set_option('display.max_colwidth', 20)
 
-__version__ = '0.2'
+__version__ = '0.2.1'
 
 
 METAINFO = enum.Enum('METAINFO', 
@@ -211,10 +211,14 @@ class Luminosity:
         text = ''
         if not self.CalInfo.empty:
             text += '\"CALInfo:\"\r\n'
-            text += self.CalInfo.to_csv(quoting=csv.QUOTE_ALL, quotechar='"')
+            text += self.CalInfo.to_csv(line_terminator='\r\n', 
+                                        quoting=csv.QUOTE_ALL, 
+                                        quotechar='"')
         if not self.ConInfo.empty:
             text += '\"CONInfo:\"\r\n'
-            text += self.ConInfo.to_csv(quoting=csv.QUOTE_ALL, quotechar='"')
+            text += self.ConInfo.to_csv(line_terminator='\r\n', 
+                                        quoting=csv.QUOTE_ALL, 
+                                        quotechar='"')
         return text
         
     def __rebuildMisc(self):
@@ -231,14 +235,17 @@ class Luminosity:
         '''
         return csv string of meta data ready to be saved into a file
         '''
-        return self.__rebuildMeta() +                self.__rebuildCalcon() + self.__rebuildMisc()
+        return self.__rebuildMeta() + \
+               self.__rebuildCalcon() + self.__rebuildMisc()
         
     def __dataCSV(self):
         text = ''
         for x in self.__data.index.levels[0]:
             text += '\"DataType:\",\"{}\"\r\n'.format(x)
-            text += self.__data.loc[x].to_csv(quoting=csv.QUOTE_ALL,
+            text += self.__data.loc[x].to_csv(line_terminator='\r\n', 
+                                              quoting=csv.QUOTE_ALL,
                                               quotechar='"') 
+            text +='\r\n'
         return text
 
     ########################### PROPERTIES ###########################
@@ -353,7 +360,8 @@ class Luminosity:
         
         try:
             #sanity check before updating
-            if (self.Beads == from_obj.Beads).all()                 and (self.DataTypes == from_obj.DataTypes).all():
+            if (self.Beads == from_obj.Beads).all() \
+                and (self.DataTypes == from_obj.DataTypes).all():
                    
                 sdata = from_obj.Data
                 
@@ -406,7 +414,7 @@ class Luminosity:
             file = self.FileName.replace('.csv', '_new.csv')
         text = self.__metaCSV() + self.__dataCSV()
         try: 
-            with open(file, 'w') as f:
+            with open(file, 'w', newline='') as f:
                 f.write(text)
             return True, file
         except:
