@@ -1,3 +1,6 @@
+'''
+OneLambda Fusion access module
+'''
 import json
 import pypyodbc
 import pandas as pd
