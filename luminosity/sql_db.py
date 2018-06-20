@@ -1,9 +1,12 @@
 import pypyodbc
-from .sql_config import Configuration
+from sql_config import Configuration
 
 class SqlConnect:
     '''
     Connect to SQL database
+    SqlConnect.connection: property
+    SqlConnect.open(): fuction, reopen db when closed
+    SqlConnect.close(): function, close the active connection
     '''
     def __init__(self, config_file):
         self.__conf = Configuration(config_file)
@@ -35,7 +38,8 @@ class SqlConnect:
         helper function
         '''
         try:
-            self.connection = pypyodbc.connect(self.__conf.connection_string)
+            self.__connection = pypyodbc.connect(self.__conf.connection_string)
+            
         except pypyodbc.DatabaseError as e:
             error_code, error_msg = e.args
             if error_code == '28000':
@@ -44,18 +48,21 @@ class SqlConnect:
                 print('Server connection problem, not found')
             else:
                 raise e
+                
         except pypyodbc.Error as e:
             error_code, error_msg = e.args
             if error_code == 'IM002':
                 print('Data source name problem')
             else:
                 raise e
+                
         except pypyodbc.ProgrammingError as e:
             error_code, error_msg = e.args
             if error_code == '42000':
                 print('The database name in connection string is not found')
             else:
                 raise e
+                
         except Exception as e:
             raise e            
             
@@ -81,3 +88,9 @@ class SqlConnect:
                 
                 
         
+    @property
+    def connection(self):
+        return self.__connection
+    
+    def cursor(self):
+        return self.__connection.cursor()

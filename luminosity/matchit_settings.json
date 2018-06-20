@@ -1,0 +1,1 @@
+{"server": "DJFX0CB2\\EVOLUTION", "db_name": "matchIT", "password": "lifematch#1", "user": "evosa", "connection_string": "Driver={{SQL Server}};Server={config[server]};Database={config[db_name]};Uid={config[user]};Pwd={config[password]};"}
