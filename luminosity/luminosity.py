@@ -2,7 +2,7 @@
 ##                                                                          ##
 ##  Luminosity - A Python Module for Reading and Writing Luminex CSV Files  ##
 ##                 By Mian Chen [mianchen(at)gmail(dot)com]                 ##
-##                        v0.2.2 2016-03-20                                 ##
+##                        v0.2.3 2018-11-16                                 ##
 ##                                                                          ##
 ##                   Release Under: Creative Common License                 ##
 ##                     Attribution-NonCommercial-ShareAlike                 ##
@@ -40,7 +40,7 @@ METAINFO = enum.Enum('METAINFO',
                       'BatchAuthor', 'BatchStartTime', 'BatchStopTime',
                       'BatchDescription', 'BatchComment'])
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 class Luminosity:
 
@@ -411,6 +411,16 @@ class Luminosity:
         '''
         return self.__calcon_info('CON')
 
+    @property
+    def loc_dict(self):
+        '''
+            Return a dictionary using well location as key and order a value
+            e.g.  '1 (H1)' --> {'(H1)': '1'}
+            TO DO: this does not work with locations not in this format
+                   make something fit other formats
+        '''
+        return {x.split(' ')[1]:x.split(' ')[0] for x in self.samples.index}
+
 
     ######################### METHODS ###################################
 
@@ -428,6 +438,21 @@ class Luminosity:
             return self.__meta[name]
         else:
             return ''
+
+    def __update_loc(self, source, excluded:list=[]):
+        excluded = [x.replace('(','').replace(')', '') for x in excluded]
+        source_locs = source.loc_dict
+        target_locs = self.loc_dict
+        s_locs = []
+        t_locs = []
+        for k, v in source_locs.items():
+            if k.replace('(','').replace(')','') not in excluded:
+                s_locs.append(f'{v} {k}')
+                t_locs.append(f'{target_locs[k]} {k}')
+        return s_locs, t_locs
+
+    def update_with_exclusion(self, from_obj, excluded_locs: list, ignorecheck=False):        
+       self.update_from(from_obj, *self.__update_loc(from_obj, excluded_locs), ignorecheck=ignorecheck)
 
 
     def update_from(self, from_obj, from_loc, to_loc, ignorecheck=False):
